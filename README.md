@@ -10,35 +10,36 @@ Built to scale horizontally, this service leverages decoupled worker queues, enc
 
 This module is architected as an event-driven microservice to ensure high availability, data security, and API rate-limit resilience across thousands of concurrent consumer inboxes.
 
-              ┌────────────────────────────────────────┐
-              │       Parent Application / UI          │
-              └──────────────────┬─────────────────────┘
-                                 │ (REST API / Webhooks)
-                                 ▼
-                    ┌────────────────────────┐
-                    │    Module API Gateway  │
-                    └────────────┬───────────┘
-                                 │
-                    ┌────────────▼───────────┐
-                    │  Task Queue (Celery)   │
-                    └────────────┬───────────┘
-                                 │ (Distributed Tasks)
-     ┌───────────────────────────┼───────────────────────────┐
-     ▼                           ▼                           ▼
+```text
+                  ┌────────────────────────────────────────┐
+                  │       Parent Application / UI          │
+                  └──────────────────┬─────────────────────┘
+                                     │ (REST API / Webhooks)
+                                     ▼
+                        ┌────────────────────────┐
+                        │    Module API Gateway  │
+                        └────────────┬───────────┘
+                                     │
+                        ┌────────────▼───────────┐
+                        │  Task Queue (Celery)   │
+                        └────────────┬───────────┘
+                                     │ (Distributed Tasks)
+         ┌───────────────────────────┼───────────────────────────┐
+         ▼                           ▼                           ▼
 ┌─────────────────┐         ┌─────────────────┐         ┌─────────────────┐
 │  Sync Worker 1  │         │  Sync Worker 2  │         │  Sync Worker N  │
 └────────┬────────┘         └────────┬────────┘         └────────┬────────┘
-│                           │                           │
-└───────────────────────────┼───────────────────────────┘
-▼
-┌───────────────────────────────────────┐
-│         Central Services Layer        │
-├───────────────────────────────────────┤
-│  • AES-256 Token Encryption Vault     │
-│  • PostgreSQL Multi-Tenant DB         │
-│  • LLM Gateway & Token Rate-Limiter   │
-└───────────────────────────────────────┘
-
+         │                           │                           │
+         └───────────────────────────┼───────────────────────────┘
+                                     ▼
+               ┌───────────────────────────────────────┐
+               │         Central Services Layer        │
+               ├───────────────────────────────────────┤
+               │  • AES-256 Token Encryption Vault     │
+               │  • PostgreSQL Multi-Tenant DB         │
+               │  • LLM Gateway & Token Rate-Limiter   │
+               └───────────────────────────────────────┘
+```
 
 ### Core Components
 1. **OAuth 2.0 Web Callback Handler:** Manages the multi-tenant web redirection flow, capturing user authorization codes securely from Google/Microsoft endpoints.
