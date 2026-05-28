@@ -1,4 +1,4 @@
-# Multi-Tenant AI Email Assistant Module 📨💼
+# Multi-Tenant AI Email Assistant Module
 
 An enterprise-grade, asynchronous, multi-tenant AI engine designed to be embedded into customer-facing applications. This module allows parent applications to securely connect to consumer inboxes (Gmail/Outlook), execute background triage, monitor usage metrics, and generate context-aware email drafts matching user-defined tone profiles.
 
@@ -6,7 +6,7 @@ Built to scale horizontally, this service leverages decoupled worker queues, enc
 
 ---
 
-## 🏗️ System Architecture
+## System Architecture
 
 This module is architected as an event-driven microservice to ensure high availability, data security, and API rate-limit resilience across thousands of concurrent consumer inboxes.
 
@@ -48,7 +48,7 @@ This module is architected as an event-driven microservice to ensure high availa
 
 ---
 
-## 🛠️ Feature Roadmap & Development Phases
+## Feature Roadmap & Development Phases
 
 ### Phase 1: Multi-Tenant Authentication & Token Security
 * [ ] Implement an OAuth 2.0 web-redirection login pipeline (FastAPI/Flask endpoint).
@@ -71,7 +71,7 @@ This module is architected as an event-driven microservice to ensure high availa
 
 ---
 
-## 🧰 Production Tech Stack
+## Production Tech Stack
 
 * **Language:** Python 3.11+
 * **Framework Interface:** FastAPI (High-performance, async-first web routing)
@@ -82,17 +82,17 @@ This module is architected as an event-driven microservice to ensure high availa
 
 ---
 
-## 🔒 Security & Compliance Architecture
+## Security & Compliance Architecture
 
 Because this module operates on private user communication data, it adheres to strict operational boundaries:
 
-> 🛡️ **Data Isolation:** Every transaction, log query, and ledger lookup contains a mandatory `user_id` context filter. Cross-tenant data leaks are guarded against at the application routing layer.
+> **Data Isolation:** Every transaction, log query, and ledger lookup contains a mandatory `user_id` context filter. Cross-tenant data leaks are guarded against at the application routing layer.
 
-> 🚫 **Write Sandboxing:** The AI engine does not possess permissions to transmit emails directly. Outbound actions are strictly restricted to writing payloads into the host inbox's native **Drafts** container, preserving an absolute human-in-the-loop requirement.
+> **Write Sandboxing:** The AI engine does not possess permissions to transmit emails directly. Outbound actions are strictly restricted to writing payloads into the host inbox's native **Drafts** container, preserving an absolute human-in-the-loop requirement.
 
 ---
 
-## 🔧 Modular Setup & Installation
+## Modular Setup & Installation
 
 *(Instructions to be completed as development progresses)*
 1. Provision a PostgreSQL instance and apply the structural migrations inside `/database/migrations`.
