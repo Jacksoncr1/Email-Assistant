@@ -175,9 +175,11 @@ After deployment, check:
 ```text
 https://your-project.vercel.app/health
 https://your-project.vercel.app/docs
+https://your-project.vercel.app/api/ping
 ```
 
 If the deployed site downloads Python source code, remove any root-level `index.py` and make sure rewrites target `/api/index`, not `/api/index.py`.
+If `/api/ping` downloads `ping.py` instead of returning `python function ok`, Vercel is not building Python Functions. Check the Vercel project Root Directory first.
 
 ### Architecture On Vercel
 
