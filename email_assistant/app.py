@@ -17,7 +17,15 @@ def create_app(
         raise ConfigurationError("Install FastAPI dependencies to run the HTTP API.") from exc
 
     settings = settings or AppSettings.from_env()
-    service = module or build_module(settings)
+    service_cache: dict[str, EmailAssistantModule] = {}
+
+    def get_service() -> EmailAssistantModule:
+        if module is not None:
+            return module
+        if "service" not in service_cache:
+            service_cache["service"] = build_module(settings)
+        return service_cache["service"]
+
     app = FastAPI(
         title="AI Email Assistant Module",
         version="0.1.0",
@@ -35,6 +43,7 @@ def create_app(
 
     @app.get("/health")
     def health() -> dict[str, Any]:
+        service = get_service()
         return {
             "ok": True,
             "providers": service.providers.names(),
@@ -53,6 +62,7 @@ def create_app(
     @app.post("/tenants/{tenant_id}/users")
     def register_user(tenant_id: str, payload: dict[str, Any] = Body(...)) -> dict[str, Any]:
         try:
+            service = get_service()
             user = service.register_user(
                 tenant_id=tenant_id,
                 email_address=str(payload["email_address"]),
@@ -75,6 +85,7 @@ def create_app(
             "redirect_uri", f"{settings.public_base_url}/oauth/{provider_name}/callback"
         )
         try:
+            service = get_service()
             return service.begin_oauth(
                 tenant_id=tenant_id,
                 user_id=user_id,
@@ -93,6 +104,7 @@ def create_app(
         redirect_uri: str | None = Query(default=None),
     ) -> dict[str, Any]:
         try:
+            service = get_service()
             user = service.complete_oauth(
                 provider_name=provider_name,
                 state=state,
@@ -106,6 +118,7 @@ def create_app(
     @app.post("/tenants/{tenant_id}/users/{user_id}/providers/mock/connect")
     def connect_mock(tenant_id: str, user_id: str) -> dict[str, Any]:
         try:
+            service = get_service()
             credential = service.connect_mock_provider(tenant_id=tenant_id, user_id=user_id)
             return {"connected": True, "provider": credential.provider}
         except EmailAssistantError as exc:
@@ -118,6 +131,7 @@ def create_app(
         provider_name: str | None = Query(default=None),
     ) -> dict[str, Any]:
         try:
+            service = get_service()
             result = service.sync_user(
                 tenant_id=tenant_id, user_id=user_id, provider_name=provider_name
             )
@@ -133,6 +147,7 @@ def create_app(
         category: str | None = Query(default=None),
     ) -> dict[str, Any]:
         try:
+            service = get_service()
             emails = service.list_emails(
                 tenant_id=tenant_id, user_id=user_id, limit=limit, category=category
             )
@@ -143,6 +158,7 @@ def create_app(
     @app.post("/tenants/{tenant_id}/users/{user_id}/emails/{email_id}/draft")
     def create_draft(tenant_id: str, user_id: str, email_id: str) -> dict[str, Any]:
         try:
+            service = get_service()
             draft = service.generate_draft(tenant_id=tenant_id, user_id=user_id, email_id=email_id)
             return to_dict(draft)
         except EmailAssistantError as exc:
@@ -153,6 +169,7 @@ def create_app(
         tenant_id: str, user_id: str, limit: int = Query(default=50, ge=1, le=250)
     ) -> dict[str, Any]:
         try:
+            service = get_service()
             drafts = service.list_drafts(tenant_id=tenant_id, user_id=user_id, limit=limit)
             return {"items": to_dict(drafts)}
         except EmailAssistantError as exc:
@@ -161,6 +178,7 @@ def create_app(
     @app.get("/tenants/{tenant_id}/users/{user_id}/tone-profile")
     def get_tone_profile(tenant_id: str, user_id: str) -> dict[str, Any]:
         try:
+            service = get_service()
             return to_dict(service.get_tone_profile(tenant_id=tenant_id, user_id=user_id))
         except EmailAssistantError as exc:
             raise translate_error(exc) from exc
@@ -170,6 +188,7 @@ def create_app(
         tenant_id: str, user_id: str, payload: dict[str, Any] = Body(...)
     ) -> dict[str, Any]:
         try:
+            service = get_service()
             tone = service.update_tone_profile(
                 tenant_id=tenant_id,
                 user_id=user_id,
