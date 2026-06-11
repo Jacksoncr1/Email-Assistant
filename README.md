@@ -109,8 +109,8 @@ This project now supports a local SQLite mode and a Vercel + Supabase mode.
 What was added for deployment:
 
 - [app.py](app.py) exposes a top-level FastAPI `app` for Vercel.
-- [index.py](index.py) exposes the same app through another Vercel-supported FastAPI entrypoint.
-- [vercel.json](vercel.json) stays minimal so Vercel can use FastAPI zero-configuration detection.
+- [api/index.py](api/index.py) exposes the FastAPI app through Vercel's Python Function layout.
+- [vercel.json](vercel.json) rewrites all paths to `/api/index`, which invokes the function without exposing the source `.py` file.
 - [.python-version](.python-version) pins Vercel to Python 3.12.
 - [database/migrations/001_initial_supabase.sql](database/migrations/001_initial_supabase.sql) creates the Supabase/Postgres tables.
 - `PostgresStore` is selected automatically when `EMAIL_ASSISTANT_DATABASE_URL` is set.
@@ -177,7 +177,7 @@ https://your-project.vercel.app/health
 https://your-project.vercel.app/docs
 ```
 
-If Vercel reports `unmatched-function-pattern`, remove the `functions` block from `vercel.json`. This project uses Vercel's FastAPI auto-detection from root-level `app.py` and `index.py`.
+If the deployed site downloads Python source code, remove any root-level `index.py` and make sure rewrites target `/api/index`, not `/api/index.py`.
 
 ### Architecture On Vercel
 
