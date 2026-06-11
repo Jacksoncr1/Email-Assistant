@@ -41,6 +41,15 @@ def create_app(
             "crypto_backend": service.cipher.backend,
         }
 
+    @app.get("/")
+    def root() -> dict[str, Any]:
+        return {
+            "name": "AI Email Assistant Module",
+            "ok": True,
+            "health_url": "/health",
+            "docs_url": "/docs",
+        }
+
     @app.post("/tenants/{tenant_id}/users")
     def register_user(tenant_id: str, payload: dict[str, Any] = Body(...)) -> dict[str, Any]:
         try:
