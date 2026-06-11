@@ -1,101 +1,280 @@
-# Multi-Tenant AI Email Assistant Module
+# AI Email Assistant Module
 
-An enterprise-grade, asynchronous, multi-tenant AI engine designed to be embedded into customer-facing applications. This module allows parent applications to securely connect to consumer inboxes (Gmail/Outlook), execute background triage, monitor usage metrics, and generate context-aware email drafts matching user-defined tone profiles.
+A reusable, multi-tenant email assistant module for inbox triage and safe draft generation. It is designed to run by itself as a FastAPI service or be imported by a larger product as a Python module.
 
-Built to scale horizontally, this service leverages decoupled worker queues, encrypted token management, and strict data isolation parameters.
+The current version is intentionally practical: it includes a local SQLite store, encrypted credential handling, a mock email provider, a deterministic local assistant, REST endpoints, a CLI demo, and tests. Gmail, Outlook, PostgreSQL, Redis/Celery deployment, and hosted LLM adapters can be added behind the existing interfaces without changing the host product API.
 
----
+## What It Does
 
-## System Architecture
+- Registers users under a required `tenant_id`.
+- Stores OAuth-style credentials encrypted at the database boundary.
+- Supports OAuth start/callback flow shape, plus a mock provider for local demos.
+- Syncs inbox messages from provider adapters.
+- Triages email into category, priority, summary, reply need, and prompt-injection flags.
+- Generates reply drafts only. It never sends email directly.
+- Stores processing ledger and token usage records for auditing.
+- Exposes the workflow through both Python and FastAPI.
 
-This module is architected as an event-driven microservice to ensure high availability, data security, and API rate-limit resilience across thousands of concurrent consumer inboxes.
+## Project Structure
 
 ```text
-                  ┌────────────────────────────────────────┐
-                  │       Parent Application / UI          │
-                  └──────────────────┬─────────────────────┘
-                                     │ (REST API / Webhooks)
-                                     ▼
-                        ┌────────────────────────┐
-                        │    Module API Gateway  │
-                        └────────────┬───────────┘
-                                     │
-                        ┌────────────▼───────────┐
-                        │  Task Queue (Celery)   │
-                        └────────────┬───────────┘
-                                     │ (Distributed Tasks)
-         ┌───────────────────────────┼───────────────────────────┐
-         ▼                           ▼                           ▼
-┌─────────────────┐         ┌─────────────────┐         ┌─────────────────┐
-│  Sync Worker 1  │         │  Sync Worker 2  │         │  Sync Worker N  │
-└────────┬────────┘         └────────┬────────┘         └────────┬────────┘
-         │                           │                           │
-         └───────────────────────────┼───────────────────────────┘
-                                     ▼
-               ┌───────────────────────────────────────┐
-               │         Central Services Layer        │
-               ├───────────────────────────────────────┤
-               │  • AES-256 Token Encryption Vault     │
-               │  • PostgreSQL Multi-Tenant DB         │
-               │  • LLM Gateway & Token Rate-Limiter   │
-               └───────────────────────────────────────┘
+email_assistant/
+  assistant.py    # Main service class for host products
+  app.py          # FastAPI route factory
+  cli.py          # Local demo and setup commands
+  config.py       # Environment-backed settings
+  llm.py          # Guardrailed LLM gateway and local/OpenAI adapters
+  providers.py    # Email provider protocol and mock provider
+  security.py     # Token encryption utilities
+  storage.py      # SQLite persistence adapter
+  worker.py       # Celery-compatible sync task entry
+tests/
+  test_assistant.py
+  test_security.py
+  test_storage.py
 ```
 
-### Core Components
-1. **OAuth 2.0 Web Callback Handler:** Manages the multi-tenant web redirection flow, capturing user authorization codes securely from Google/Microsoft endpoints.
-2. **Distributed Sync Workers:** Background daemons (Celery + Redis) that independently poll inboxes, handling service providers' API rate limits and execution retries.
-3. **Data Isolation & Encryption Vault:** A PostgreSQL persistence layer enforcing row-level security combined with application-layer encryption for user refresh tokens.
-4. **Guardrailed LLM Gateway:** An outbound API wrapper that enforces JSON schemas, strips injection attempts, and logs real-time token/cost footprints per user.
+## Quickstart
 
----
+Requires Python 3.10 or newer. Python 3.11+ is recommended for production.
 
-## Feature Roadmap & Development Phases
+```cmd
+scripts\setup.cmd
+```
 
-### Phase 1: Multi-Tenant Authentication & Token Security
-* [ ] Implement an OAuth 2.0 web-redirection login pipeline (FastAPI/Flask endpoint).
-* [ ] Design an application-layer cryptography utility using AES-256 (via `cryptography.fernet`) to encrypt/decrypt OAuth tokens at the database boundary.
-* [ ] Create a relational, multi-tenant schema mapping users, credentials, and processing ledgers using strict foreign key isolation.
+If you prefer to run the commands manually from Command Prompt:
 
-### Phase 2: Scalable Sync & Ingestion Infrastructure
-* [ ] Set up a Celery task queuing system backed by Redis for concurrent task processing.
-* [ ] Build a distributed background cron worker that schedules rolling inbox checks (e.g., every 10 minutes per active tenant).
-* [ ] Implement an API request coordinator that respects provider rate limits (exponential backoff and jitter algorithms).
+```cmd
+py -m venv .venv
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+copy .env.example .env
+.venv\Scripts\python.exe -m email_assistant generate-secret
+```
 
-### Phase 3: Defensive LLM Pipeline & Safety Controls
-* [ ] Design structured JSON output validation schemas (OpenAI Structured Outputs / Pydantic) to ensure predictable model triage categorizations.
-* [ ] Implement an LLM wrapper that sanitizes email body inputs inside structural XML tags to mitigate prompt-injection vulnerabilities.
-* [ ] Implement a database middleware counter tracking running token usage per `user_id` to prevent billing exploits.
+Put the generated secret into `.env` as `EMAIL_ASSISTANT_SECRET_KEY`.
 
-### Phase 4: Customization Engine & Embedded UX (SDK Layer)
-* [ ] Expose configuration endpoints allowing users to update tone profiles (sliders, custom directives) dynamically via DB state adjustments.
-* [ ] Build a local mock dashboard interface to demonstrate webhook interactions and audit trails.
+Initialize the database:
 
----
+```cmd
+.venv\Scripts\python.exe -m email_assistant init-db
+```
 
-## Production Tech Stack
+Run the local end-to-end demo:
 
-* **Language:** Python 3.11+
-* **Framework Interface:** FastAPI (High-performance, async-first web routing)
-* **Task Management:** Celery + Redis
-* **Database:** PostgreSQL (Robust multi-tenant indexing and transaction tracking)
-* **Encryption:** `cryptography` (Python Fernet primitives)
-* **LLM Engine:** LiteLLM / OpenAI SDK with Pydantic output parsing
+```cmd
+scripts\demo.cmd
+```
 
----
+That demo registers a user, connects the mock provider, syncs mock inbox messages, triages them, and creates a draft reply.
 
-## Security & Compliance Architecture
+## Run The API
 
-Because this module operates on private user communication data, it adheres to strict operational boundaries:
+```cmd
+scripts\api.cmd
+```
 
-> **Data Isolation:** Every transaction, log query, and ledger lookup contains a mandatory `user_id` context filter. Cross-tenant data leaks are guarded against at the application routing layer.
+Open:
 
-> **Write Sandboxing:** The AI engine does not possess permissions to transmit emails directly. Outbound actions are strictly restricted to writing payloads into the host inbox's native **Drafts** container, preserving an absolute human-in-the-loop requirement.
+```text
+http://127.0.0.1:8000/docs
+```
 
----
+Useful endpoints:
 
-## Modular Setup & Installation
+```text
+GET  /health
+POST /tenants/{tenant_id}/users
+POST /tenants/{tenant_id}/users/{user_id}/providers/mock/connect
+POST /tenants/{tenant_id}/users/{user_id}/sync
+GET  /tenants/{tenant_id}/users/{user_id}/emails
+POST /tenants/{tenant_id}/users/{user_id}/emails/{email_id}/draft
+GET  /tenants/{tenant_id}/users/{user_id}/drafts
+GET  /tenants/{tenant_id}/users/{user_id}/tone-profile
+PUT  /tenants/{tenant_id}/users/{user_id}/tone-profile
+```
 
-*(Instructions to be completed as development progresses)*
-1. Provision a PostgreSQL instance and apply the structural migrations inside `/database/migrations`.
-2. Configure environmental variables inside `.env` including your master AES encryption keys, provider client secrets, and LLM endpoints.
-3. Initialize the distributed task broker daemon: `celery -A tasks worker --loglevel=info`.
+Example user creation body:
+
+```json
+{
+  "email_address": "demo@example.com",
+  "external_user_id": "parent-app-user-123"
+}
+```
+
+## Deploy With Vercel And Supabase
+
+This project now supports a local SQLite mode and a Vercel + Supabase mode.
+
+What was added for deployment:
+
+- [app.py](app.py) exposes a top-level FastAPI `app` for Vercel.
+- [vercel.json](vercel.json) excludes local-only files from the Python Function bundle.
+- [.python-version](.python-version) pins Vercel to Python 3.12.
+- [database/migrations/001_initial_supabase.sql](database/migrations/001_initial_supabase.sql) creates the Supabase/Postgres tables.
+- `PostgresStore` is selected automatically when `EMAIL_ASSISTANT_DATABASE_URL` is set.
+
+### 1. Create Supabase Tables
+
+Create a Supabase project, open the SQL Editor, and run:
+
+```sql
+-- database/migrations/001_initial_supabase.sql
+```
+
+The schema mirrors the local SQLite schema so the same service code works in both places.
+
+### 2. Use The Supabase Pooler URL
+
+For Vercel serverless functions, use Supabase's Transaction pooler connection string:
+
+```text
+postgres://postgres.PROJECT_REF:PASSWORD@aws-0-REGION.pooler.supabase.com:6543/postgres?sslmode=require
+```
+
+Put that value in Vercel as:
+
+```text
+EMAIL_ASSISTANT_DATABASE_URL=...
+```
+
+The app disables prepared statements for Postgres connections because Supabase transaction pooling does not support them.
+
+### 3. Add Vercel Environment Variables
+
+In the Vercel dashboard, add:
+
+```text
+EMAIL_ASSISTANT_DATABASE_URL=...
+EMAIL_ASSISTANT_SECRET_KEY=your-generated-secret
+EMAIL_ASSISTANT_ENVIRONMENT=production
+EMAIL_ASSISTANT_LLM_PROVIDER=local
+EMAIL_ASSISTANT_PUBLIC_BASE_URL=https://your-project.vercel.app
+```
+
+If you enable the OpenAI adapter later, also add:
+
+```text
+EMAIL_ASSISTANT_LLM_PROVIDER=openai
+EMAIL_ASSISTANT_OPENAI_API_KEY=...
+EMAIL_ASSISTANT_OPENAI_MODEL=...
+```
+
+### 4. Deploy
+
+Install the Vercel CLI if needed, then deploy from the project root:
+
+```cmd
+vercel
+vercel --prod
+```
+
+After deployment, check:
+
+```text
+https://your-project.vercel.app/health
+https://your-project.vercel.app/docs
+```
+
+### Architecture On Vercel
+
+```text
+Browser / Parent App
+        |
+        v
+Vercel Python Function (FastAPI)
+        |
+        v
+Supabase Postgres via Transaction Pooler
+```
+
+For this backend, Supabase is used as Postgres storage. If the parent product already uses Supabase Auth, store that auth user id in this module's `external_user_id` field when registering users.
+
+## Use As A Python Module
+
+```python
+from email_assistant import AppSettings, build_module
+
+module = build_module(AppSettings.from_env())
+user = module.register_user(
+    tenant_id="tenant-a",
+    email_address="alex@example.com",
+    external_user_id="parent-user-123",
+)
+
+module.connect_mock_provider(tenant_id="tenant-a", user_id=user.id)
+sync = module.sync_user(tenant_id="tenant-a", user_id=user.id)
+emails = module.list_emails(tenant_id="tenant-a", user_id=user.id)
+draft = module.generate_draft(
+    tenant_id="tenant-a",
+    user_id=user.id,
+    email_id=emails[0].id,
+)
+```
+
+## Configuration
+
+Set these in `.env` or the host environment:
+
+```text
+EMAIL_ASSISTANT_DB_PATH=./data/email_assistant.db
+EMAIL_ASSISTANT_DATABASE_URL=
+EMAIL_ASSISTANT_SECRET_KEY=change-me
+EMAIL_ASSISTANT_ENVIRONMENT=development
+EMAIL_ASSISTANT_LLM_PROVIDER=local
+EMAIL_ASSISTANT_PUBLIC_BASE_URL=http://localhost:8000
+```
+
+Optional OpenAI adapter:
+
+```text
+EMAIL_ASSISTANT_LLM_PROVIDER=openai
+EMAIL_ASSISTANT_OPENAI_API_KEY=...
+EMAIL_ASSISTANT_OPENAI_MODEL=...
+```
+
+If no hosted LLM is configured, the module uses `LocalHeuristicLLMClient`, which is deterministic and works offline. It is useful for development, tests, frontend integration, and demos.
+
+## Security Model
+
+- Every public storage method requires `tenant_id` and `user_id`.
+- Cross-tenant access raises `TenantAccessError`.
+- OAuth tokens are encrypted before being stored.
+- Production mode requires the `cryptography` package and Fernet-backed encryption.
+- Email content is treated as untrusted input.
+- Prompt-injection patterns are flagged during triage.
+- The assistant only creates drafts. It does not send email.
+
+## Testing
+
+Run the standard-library test suite:
+
+```cmd
+scripts\test.cmd
+```
+
+Current coverage checks:
+
+- Token encryption roundtrip and tamper rejection.
+- Tenant isolation.
+- Mock provider sync.
+- Idempotent repeated syncs.
+- Prompt-injection detection.
+- Draft creation.
+
+## Current Status
+
+Implemented:
+
+- Phase 1 core: tenant users, credential encryption, OAuth-shaped state/callback flow.
+- Phase 2 local foundation: sync orchestration and provider adapter protocol.
+- Phase 3 core: guarded LLM gateway, structured triage result, token usage logging.
+- Phase 4 foundation: tone profile settings and embeddable API/module layer.
+
+Next production steps:
+
+- Add Gmail and Outlook provider adapters.
+- Add PostgreSQL storage adapter and migrations.
+- Add Redis/Celery schedule configuration.
+- Add cost-aware rate limits per tenant/user.
+- Add a small dashboard that consumes the existing REST API.

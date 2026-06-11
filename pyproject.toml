@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "email-assistant-module"
+version = "0.1.0"
+description = "Reusable multi-tenant AI email assistant module with FastAPI integration."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "cryptography>=42.0",
+    "python-dotenv>=1.0",
+    "psycopg[binary]>=3.2",
+]
+
+[project.optional-dependencies]
+openai = ["openai>=1.0"]
+dev = ["pytest>=8.0", "httpx>=0.27"]
+
+[project.scripts]
+email-assistant = "email_assistant.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["email_assistant*"]
